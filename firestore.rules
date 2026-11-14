@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Per-user data: saved fixtures, preferences and pick history. Owner-only.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Football data cache, written by the football data provider sync.
+    //
+    // Every read and write of these collections happens on the server through the
+    // Firebase Admin SDK, which bypasses these rules entirely. The browser never talks
+    // to them directly: it goes through the gated /api/football/* routes. Closing them
+    // to clients therefore keeps provider data (and any credit-consuming payload)
+    // unreachable from the browser, and leaves no collection open by accident.
+    match /leagues/{docId} {
+      allow read, write: if false;
+    }
+
+    match /teams/{docId} {
+      allow read, write: if false;
+    }
+
+    match /fixtures/{docId} {
+      allow read, write: if false;
+    }
+
+    match /match_statistics/{docId} {
+      allow read, write: if false;
+    }
+
+    match /odds/{docId} {
+      allow read, write: if false;
+    }
+
+    // Reserved for the prediction engine; nothing writes to these yet.
+    match /predictions/{docId} {
+      allow read, write: if false;
+    }
+
+    match /prediction_results/{docId} {
+      allow read, write: if false;
+    }
+  }
+}
