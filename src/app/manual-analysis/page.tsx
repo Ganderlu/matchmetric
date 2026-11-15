@@ -20,8 +20,9 @@ import {
   ListChecks,
   LoaderCircle,
   LockKeyhole,
+  LogOut,
   Search,
-  ShieldCheck,
+  Settings,
   Sparkles,
   Target,
   Trash2,
@@ -117,6 +118,8 @@ function ManualSidebar({
   leagueId: string;
   onLeague: (id: string) => void;
 }) {
+  const { user, logOut } = useAuth();
+  const handleLogOut = () => void logOut().then(() => { window.location.assign("/login"); });
   return (
     <aside className="sidebar manual-sidebar" aria-label="Sidebar navigation">
       <div className="nav-group">
@@ -133,6 +136,7 @@ function ManualSidebar({
         <Link className="nav-item" href="/account"><BookMarked size={16} /><span>Saved Picks</span></Link>
         <Link className="nav-item" href="/account"><Clock3 size={16} /><span>Prediction History</span></Link>
         <Link className="nav-item" href="/account"><BarChart3 size={16} /><span>Performance Statistics</span></Link>
+        <Link className="nav-item" href="/settings"><Settings size={16} /><span>Settings</span></Link>
       </div>
       <div className="nav-group">
         <p className="nav-label">LEAGUES</p>
@@ -153,9 +157,17 @@ function ManualSidebar({
           <p className="sidebar-disclaimer">Available competitions appear when the provider is connected.</p>
         )}
       </div>
-      <div className="sidebar-note">
-        <div className="note-title"><ShieldCheck size={14} /> Play smart. Predict better.</div>
-        <p>Model probabilities are estimates, not guarantees. Please use MatchMetric responsibly.</p>
+      <div className="sidebar-footer">
+        {user ? (
+          <button className="nav-item logout-item" onClick={handleLogOut}>
+            <LogOut size={16} strokeWidth={1.8} /><span>Log out</span>
+          </button>
+        ) : (
+          <Link className="nav-item" href="/login">
+            <LogOut size={16} strokeWidth={1.8} /><span>Log in</span>
+          </Link>
+        )}
+        <p className="sidebar-disclaimer">Analysis is informational, not a guarantee of match outcomes. Please use responsibly.</p>
       </div>
     </aside>
   );

@@ -28,7 +28,8 @@ export async function GET(request: Request) {
     return NextResponse.json(result, {
       headers: { "Cache-Control": "public, max-age=0, s-maxage=300" },
     });
-  } catch {
+  } catch (error) {
+    console.error("Football leagues route failed:", error);
     return NextResponse.json(
       { error: "League navigation is temporarily unavailable." },
       { status: 502 },

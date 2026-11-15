@@ -70,6 +70,28 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  const uid = await authenticatedUid(request);
+  if (!uid) {
+    return NextResponse.json({ error: "Sign in to manage saved predictions." }, { status: 401 });
+  }
+
+  const db = getAdminDb();
+  if (!db) {
+    return NextResponse.json({ error: "Saved predictions are not configured on the server." }, { status: 503 });
+  }
+
+  try {
+    const snapshot = await db.collection("users").doc(uid).collection("savedPredictions").get();
+    const batch = db.batch();
+    snapshot.docs.forEach((entry) => batch.delete(entry.ref));
+    await batch.commit();
+    return NextResponse.json({ removed: snapshot.size }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Saved predictions could not be cleared." }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const uid = await authenticatedUid(request);
   if (!uid) {

@@ -29,3 +29,11 @@ export async function getSavedFixtureIds(uid: string) {
   const snapshot = await getDocs(collection(firebaseFirestore, "users", uid, "savedPicks"));
   return snapshot.docs.map((savedPick) => savedPick.id);
 }
+
+/** Remove every saved fixture for a member. Used by the settings data controls. */
+export async function clearSavedFixtures(uid: string) {
+  if (!firebaseFirestore) throw new Error("Cloud Firestore is not configured.");
+  const snapshot = await getDocs(collection(firebaseFirestore, "users", uid, "savedPicks"));
+  await Promise.all(snapshot.docs.map((savedPick) => deleteDoc(savedPick.ref)));
+  return snapshot.size;
+}

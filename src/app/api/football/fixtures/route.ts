@@ -86,7 +86,8 @@ export async function GET(request: Request) {
   try {
     const feed = await getFixtureFeed(query);
     return NextResponse.json(feed, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    console.error("Football fixtures route failed:", error);
     return NextResponse.json(
       { error: "Football fixtures are temporarily unavailable. Please try again." },
       { status: 502 },

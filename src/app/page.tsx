@@ -14,18 +14,16 @@ import {
   ChevronRight,
   Clock3,
   FileImage,
-  Flame,
   Goal,
   Home,
-  Info,
   ListChecks,
   LockKeyhole,
+  LogOut,
   Menu,
   RefreshCw,
   Search,
   ShieldCheck,
   Shirt,
-  Sparkles,
   Target,
   TrendingUp,
   Trophy,
@@ -243,6 +241,8 @@ function Sidebar({
   open: boolean;
   leagues: LeagueView[];
 }) {
+  const { user, logOut } = useAuth();
+  const handleLogOut = () => void logOut().then(() => { window.location.assign("/login"); });
   const explore = [
     { label: "Home", icon: Home },
     { label: "Fixtures", icon: CalendarDays },
@@ -297,12 +297,18 @@ function Sidebar({
         ))}
         {!leagues.length && <p className="sidebar-disclaimer">Competitions load from the football data provider.</p>}
       </div>
-      <div className="sidebar-note">
-        <div className="note-title"><Sparkles size={14} /> Your matchday, in focus</div>
-        <p>Build a personal workspace for the fixtures and analysis you follow.</p>
-        <Link className="outline-button" href="/register">Create a free account <ArrowRight size={12} /></Link>
+      <div className="sidebar-footer">
+        {user ? (
+          <button className="nav-item logout-item" onClick={handleLogOut}>
+            <LogOut size={16} strokeWidth={1.8} /><span>Log out</span>
+          </button>
+        ) : (
+          <Link className="nav-item" href="/login">
+            <LogOut size={16} strokeWidth={1.8} /><span>Log in</span>
+          </Link>
+        )}
+        <p className="sidebar-disclaimer">Analysis is informational, not a guarantee of match outcomes. Please use responsibly.</p>
       </div>
-      <p className="sidebar-disclaimer">Analysis is informational, not a guarantee of match outcomes. Please use responsibly.</p>
     </aside>
   );
 }
@@ -410,91 +416,6 @@ function FixtureSkeletons({ count = 4 }: { count?: number }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function FeatureCards({ onOpen }: { onOpen: (kind: ModalKind) => void }) {
-  const features = [
-    { title: "Automatic Picks", text: "Shape a shortlist around odds, leagues and the markets you prefer.", icon: Zap, kind: "automatic" as const },
-    { title: "Manual Match Analysis", text: "Compare fixtures side by side and inspect each available market.", icon: Target, kind: "manual" as const },
-    { title: "Screenshot Analysis", text: "Upload a bet slip image to review its fixtures and selections.", icon: Camera, kind: "screenshot" as const },
-  ];
-  return (
-    <section className="feature-section" id="features" aria-label="Prediction tools">
-      <div className="feature-grid">
-        {features.map(({ title, text, icon: Icon, kind }) => (
-          <button className="feature-card" key={title} onClick={() => onOpen(kind)}>
-            <span className="feature-icon"><Icon size={19} /></span>
-            <span className="feature-copy"><strong>{title}</strong><span>{text}</span></span>
-            <ArrowRight className="feature-arrow" size={15} />
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RightPanel({
-  onCreateAccount,
-  fixtures,
-  leagues,
-  provider,
-  source,
-}: {
-  onCreateAccount: () => void;
-  fixtures: FixtureView[];
-  leagues: LeagueView[];
-  provider: string;
-  source: DataSource | null;
-}) {
-  return (
-    <aside className="right-column" aria-label="Football insights">
-      <section className="side-card">
-        <div className="side-card-heading">
-          <h2><Flame size={15} /> Market categories</h2>
-        </div>
-        <div className="popular-list">
-          {marketCategoryOrder.map((key) => (
-            <div className="popular-row" key={key}>
-              <div><div className="popular-match">{marketCategories[key].label}</div><div className="popular-description">{marketCategories[key].short}</div></div>
-            </div>
-          ))}
-        </div>
-        <p className="field-help" style={{ margin: "9px 0 0" }}>The interface is ready for these categories. Only markets your provider actually returns are shown for each match.</p>
-      </section>
-      <section className="side-card">
-        <div className="side-card-heading">
-          <h2><CalendarDays size={15} /> Upcoming fixtures</h2>
-          <a href="#fixtures" className="small-link">All <ArrowRight size={11} /></a>
-        </div>
-        {fixtures.length ? fixtures.slice(0, 4).map((fixture) => (
-          <div className="upcoming-row" key={fixture.id}>
-            <span className="upcoming-time">{timeFormatter.format(new Date(fixture.kickoff))}</span>
-            <span>
-              <span className="upcoming-teams">{fixture.home.name} · {fixture.away.name}</span>
-              <span className="upcoming-league">{fixture.league.name}</span>
-            </span>
-          </div>
-        )) : <p className="mc-section-note">No fixtures are loaded for this date.</p>}
-      </section>
-      <section className="side-card">
-        <div className="side-card-heading">
-          <h2><TrendingUp size={15} /> Data status</h2>
-          {source && <span className="demo-label">{SOURCE_LABEL[source]}</span>}
-        </div>
-        <div className="performance-stat"><span>Football provider</span><strong>{provider}</strong></div>
-        <div className="performance-stat"><span>Competitions tracked</span><strong>{leagues.length}</strong></div>
-        <div className="performance-stat"><span>Market categories</span><strong>{marketCategoryOrder.length}</strong></div>
-        <div className="performance-stat"><span>Verified accuracy</span><strong>Not available</strong></div>
-        <p className="field-help" style={{ margin: "8px 0 0" }}>Performance data will appear after independently verified results are available.</p>
-      </section>
-      <section className="side-card signup-card">
-        <h2>Your analysis, all in one place</h2>
-        <p>Create an account to save selections, request match analysis and review your own history.</p>
-        <button className="primary-button" onClick={onCreateAccount}>Create free account <ArrowRight size={13} /></button>
-      </section>
-      <p className="disclaimer" id="responsible-use"><Info size={12} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />Match insights are informational and never guarantee an outcome. Please make considered choices.</p>
-    </aside>
   );
 }
 
@@ -998,7 +919,6 @@ export default function DashboardPage() {
   const [leagues, setLeagues] = useState<LeagueView[]>([]);
   const [fixtures, setFixtures] = useState<FixtureView[]>([]);
   const [feedSource, setFeedSource] = useState<DataSource | null>(null);
-  const [feedProvider, setFeedProvider] = useState("");
   const [feedNotice, setFeedNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState("");
@@ -1041,7 +961,6 @@ export default function DashboardPage() {
       .then((result) => {
         if (!active) return;
         setFeedSource(result.source);
-        setFeedProvider(result.provider);
         setFeedNotice(result.notice ?? "");
         setHasMore(result.hasMore);
         setFixtures((current) => (page === 1 ? result.fixtures : [...current, ...result.fixtures]));
@@ -1112,11 +1031,6 @@ export default function DashboardPage() {
     });
   }, [fixtures, dayKey, statusFilter, search, fixtureSearch]);
 
-  const upcoming = useMemo(
-    () => visibleFixtures.filter((fixture) => fixture.status === "scheduled").slice(0, 4),
-    [visibleFixtures],
-  );
-
   const changeDay = (next: string) => { setPage(1); setDayKey(next); };
   const selectLeague = (next: string | null) => { setPage(1); setLeagueId(next); };
 
@@ -1138,6 +1052,10 @@ export default function DashboardPage() {
     }
     if (item === "Manual Analysis") {
       window.location.assign("/manual-analysis");
+      return;
+    }
+    if (item === "Settings") {
+      window.location.assign(user ? "/settings" : "/login?next=%2Fsettings");
       return;
     }
     const gated: Record<string, ModalKind> = {
@@ -1321,23 +1239,7 @@ export default function DashboardPage() {
                 {loading ? <><span className="spinner" /> Loading</> : <>Load more fixtures <ArrowRight size={12} /></>}
               </button>
             )}
-
-            <FeatureCards onOpen={(kind) => {
-              if (kind === "manual") window.location.assign("/manual-analysis");
-              else setModal(kind);
-            }} />
-            <div className="market-strip">
-              <span className="market-strip-label">Market categories</span>
-              {marketCategoryOrder.map((key) => <span className="market-chip" key={key}>{marketCategories[key].label}</span>)}
-            </div>
           </div>
-          <RightPanel
-            onCreateAccount={() => { window.location.href = "/register"; }}
-            fixtures={upcoming}
-            leagues={leagues}
-            provider={feedProvider || "not connected"}
-            source={feedSource}
-          />
         </main>
       </div>
       <nav className="mobile-bottom-nav" aria-label="Quick navigation">

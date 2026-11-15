@@ -76,7 +76,12 @@ export function isFresh(value: unknown, now = Date.now()): boolean {
 }
 
 function db(): Firestore | null {
-  return getAdminDb();
+  try {
+    return getAdminDb();
+  } catch {
+    // Firestore caching is optional; a bad cache credential must not block live provider data.
+    return null;
+  }
 }
 
 /**
