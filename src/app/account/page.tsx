@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Settings, ShieldCheck } from "lucide-react";
 import { SavedPredictions } from "./saved-predictions";
+import { ModelAccuracy } from "./performance";
 
 export default function AccountPage() {
   return (
@@ -11,6 +12,7 @@ export default function AccountPage() {
         <h1>Your MatchMetric account</h1>
         <p>Your verified session is active. Saved manual analyses are private to your account.</p>
         <div className="notice success-notice"><CheckCircle2 size={14} style={{ verticalAlign: "-3px", marginRight: 5 }} />You are signed in with a server-verified session.</div>
+        <ModelAccuracy />
         <SavedPredictions />
         <div className="account-actions">
           <Link className="outline-button" href="/settings"><Settings size={14} /> Settings</Link>

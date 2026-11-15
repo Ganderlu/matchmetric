@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionCookie } from "@/lib/firebase-admin";
-import { generateManualPrediction } from "@/lib/football/manual-engine";
-import { getMatchCentre } from "@/lib/football/service";
+import { analyzeFixture, recordRecommendation } from "@/lib/football/prediction-engine";
 import { clientKey, consume, RateLimitError } from "@/lib/football/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const FIXTURE_ID = /^(sportmonks|api-football):[A-Za-z0-9_-]+$/;
-
+/**
+ * Manual analysis for one fixture. The route owns authentication and rate limiting; the
+ * prediction itself (validation, provider resolution, generation, tracking) is delegated to
+ * the central engine so the manual, automatic and screenshot flows share one implementation.
+ */
 export async function POST(request: NextRequest) {
   const session = request.cookies.get("__session")?.value;
   if (!session) {
@@ -45,8 +47,7 @@ export async function POST(request: NextRequest) {
   if (
     !Array.isArray(fixtureIds) ||
     fixtureIds.length !== 1 ||
-    typeof fixtureIds[0] !== "string" ||
-    !FIXTURE_ID.test(fixtureIds[0])
+    typeof fixtureIds[0] !== "string"
   ) {
     return NextResponse.json(
       { error: "Analyze one valid, real-provider fixture at a time. Demo fixtures cannot be analyzed." },
@@ -54,29 +55,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  try {
-    const result = await getMatchCentre(fixtureIds[0]);
-    const detail = result.detail;
-    if (!detail || (result.source !== "provider" && result.source !== "cache")) {
-      return NextResponse.json(
-        { error: result.notice ?? "Real match information is unavailable for this fixture." },
-        { status: result.source === "unconfigured" ? 503 : 404 },
-      );
-    }
-
-    if (detail.fixture.status !== "scheduled" || Date.parse(detail.fixture.kickoff) <= Date.now()) {
-      return NextResponse.json(
-        { error: "Manual pre-match analysis is available only for future scheduled fixtures." },
-        { status: 422 },
-      );
-    }
-
-    return NextResponse.json(
-      { result: generateManualPrediction(detail), source: result.source },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Manual analysis is temporarily unavailable.";
-    return NextResponse.json({ error: message }, { status: 502 });
+  const outcome = await analyzeFixture(fixtureIds[0]);
+  if (!outcome.ok) {
+    return NextResponse.json({ error: outcome.error }, { status: outcome.status });
   }
+
+  // A value-qualified pick is filed in the tracked ledger for later accuracy grading.
+  await recordRecommendation(outcome.analysis);
+
+  return NextResponse.json(
+    { result: outcome.analysis.result, source: outcome.analysis.source },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

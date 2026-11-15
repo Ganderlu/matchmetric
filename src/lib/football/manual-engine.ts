@@ -7,11 +7,14 @@ import type {
   EvaluatedMarket,
   ManualPredictionResult,
   PredictionDataQuality,
+  SettlementTarget,
 } from "../manual-predictions";
 
 export const MANUAL_MODEL_VERSION = "form-poisson-odds-1.0.0";
 const MAX_GOALS = 10;
 const MIN_FORM_MATCHES = 3;
+/** The single totals line this model estimates; graded identically by accuracy tracking. */
+const OVER_UNDER_LINE = 2.5;
 
 interface FormMetrics {
   count: number;
@@ -32,6 +35,7 @@ interface MarketCandidate {
   category: MarketCategoryKey;
   market: string;
   selection: string;
+  settlement: SettlementTarget;
   probability: number;
   odds: number;
 }
@@ -81,6 +85,7 @@ export function generateManualPrediction(detail: MatchDetailView): ManualPredict
         category: candidate.category,
         market: candidate.market,
         selection: candidate.selection,
+        settlement: candidate.settlement,
         estimatedProbability: percent(candidate.probability),
         impliedProbability: percent(1 / candidate.odds),
         odds: candidate.odds,
@@ -155,6 +160,7 @@ export function generateManualPrediction(detail: MatchDetailView): ManualPredict
     recommendedMarket: recommendation?.category ?? null,
     marketLabel: recommendation ? marketCategories[recommendation.category].label : null,
     recommendedSelection: recommendation?.selection ?? null,
+    recommendedSettlement: recommendation?.settlement ?? null,
     estimatedProbability: recommendation?.estimatedProbability ?? null,
     confidence: recommendation ? confidence : null,
     ...(recommendation
@@ -182,6 +188,7 @@ function baseResult(
     recommendedMarket: null,
     marketLabel: null,
     recommendedSelection: null,
+    recommendedSettlement: null,
     estimatedProbability: null,
     confidence: null,
     dataQuality,
@@ -326,47 +333,38 @@ function createMarketCandidates(
     category: MarketCategoryKey,
     market: OddsMarket,
     selection: string,
+    settlement: SettlementTarget,
     probability: number,
     price: number,
   ) => {
     if (!Number.isFinite(price) || price <= 1 || !Number.isFinite(probability)) return;
-    candidates.push({ category, market: market.name, selection, probability, odds: price });
+    candidates.push({ category, market: market.name, selection, settlement, probability, odds: price });
   };
 
   for (const market of odds) {
     for (const offered of market.selections) {
       const label = normalise(offered.label);
       if (market.category === "match-winner") {
-        const probability = isHomeLabel(label, homeName)
-          ? outcome.home
-          : isAwayLabel(label, awayName)
-            ? outcome.away
-            : isDrawLabel(label)
-              ? outcome.draw
-              : undefined;
-        if (probability !== undefined) push(market.category, market, offered.label, probability, offered.price);
+        if (isHomeLabel(label, homeName)) push(market.category, market, offered.label, { market: "1x2", side: "home" }, outcome.home, offered.price);
+        else if (isAwayLabel(label, awayName)) push(market.category, market, offered.label, { market: "1x2", side: "away" }, outcome.away, offered.price);
+        else if (isDrawLabel(label)) push(market.category, market, offered.label, { market: "1x2", side: "draw" }, outcome.draw, offered.price);
       } else if (market.category === "double-chance") {
-        const probability = isHomeDrawLabel(label)
-          ? outcome.homeDraw
-          : isHomeAwayLabel(label)
-            ? outcome.homeAway
-            : isAwayDrawLabel(label)
-              ? outcome.awayDraw
-              : undefined;
-        if (probability !== undefined) push(market.category, market, offered.label, probability, offered.price);
+        if (isHomeDrawLabel(label)) push(market.category, market, offered.label, { market: "double-chance", side: "home-draw" }, outcome.homeDraw, offered.price);
+        else if (isHomeAwayLabel(label)) push(market.category, market, offered.label, { market: "double-chance", side: "home-away" }, outcome.homeAway, offered.price);
+        else if (isAwayDrawLabel(label)) push(market.category, market, offered.label, { market: "double-chance", side: "away-draw" }, outcome.awayDraw, offered.price);
       } else if (market.category === "btts") {
-        if (label === "yes") push(market.category, market, offered.label, outcome.bttsYes, offered.price);
-        if (label === "no") push(market.category, market, offered.label, outcome.bttsNo, offered.price);
+        if (label === "yes") push(market.category, market, offered.label, { market: "btts", side: "yes" }, outcome.bttsYes, offered.price);
+        if (label === "no") push(market.category, market, offered.label, { market: "btts", side: "no" }, outcome.bttsNo, offered.price);
       } else if (market.category === "over-under" && marketHasLine(market, offered.label)) {
-        if (/\bover\b/.test(label)) push(market.category, market, offered.label, outcome.over25, offered.price);
-        if (/\bunder\b/.test(label)) push(market.category, market, offered.label, outcome.under25, offered.price);
+        if (/\bover\b/.test(label)) push(market.category, market, offered.label, { market: "over-under", side: "over", line: OVER_UNDER_LINE }, outcome.over25, offered.price);
+        if (/\bunder\b/.test(label)) push(market.category, market, offered.label, { market: "over-under", side: "under", line: OVER_UNDER_LINE }, outcome.under25, offered.price);
       } else if (market.category === "draw-no-bet") {
         const decisiveTotal = outcome.home + outcome.away;
         if (decisiveTotal > 0 && isHomeLabel(label, homeName)) {
-          push(market.category, market, offered.label, outcome.home / decisiveTotal, offered.price);
+          push(market.category, market, offered.label, { market: "dnb", side: "home" }, outcome.home / decisiveTotal, offered.price);
         }
         if (decisiveTotal > 0 && isAwayLabel(label, awayName)) {
-          push(market.category, market, offered.label, outcome.away / decisiveTotal, offered.price);
+          push(market.category, market, offered.label, { market: "dnb", side: "away" }, outcome.away / decisiveTotal, offered.price);
         }
       }
     }

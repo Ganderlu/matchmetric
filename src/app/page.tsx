@@ -12,7 +12,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CirclePlay,
   Clock3,
+  Ellipsis,
   FileImage,
   Goal,
   Home,
@@ -21,10 +23,13 @@ import {
   LogOut,
   Menu,
   RefreshCw,
+  Radio,
   Search,
+  Settings,
   ShieldCheck,
   Shirt,
   Target,
+  TicketCheck,
   TrendingUp,
   Trophy,
   Upload,
@@ -179,8 +184,43 @@ function AppHeader({
   onHow: () => void;
 }) {
   const { user, logOut } = useAuth();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
+
+  const handleLogOut = async () => {
+    setLoggingOut(true);
+    setLogoutError("");
+    try {
+      await logOut();
+      window.location.assign("/login");
+    } catch {
+      setLogoutError("Could not sign out. Please try again.");
+      setLoggingOut(false);
+    }
+  };
+
   return (
-    <header className="topbar">
+    <header className="topbar dashboard-topbar">
       <button className="icon-button mobile-menu-button" onClick={onMenu} aria-label="Open navigation">
         <Menu size={19} />
       </button>
@@ -212,16 +252,65 @@ function AppHeader({
               <button className="icon-button notification-button" aria-label="Notifications">
                 <Bell size={16} />
               </button>
+              <div className="account-menu-wrap" ref={accountMenuRef}>
+                <button
+                  className="icon-button account-menu-trigger"
+                  type="button"
+                  aria-label="Open account settings and sign-out menu"
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  onClick={() => { setLogoutError(""); setAccountMenuOpen((open) => !open); }}
+                >
+                  <Settings size={17} strokeWidth={1.9} />
+                </button>
+                {accountMenuOpen && (
+                  <div className="account-menu" role="menu" aria-label="Account menu">
+                    <div className="account-menu-heading">
+                      <span className="avatar">{getInitials(user.displayName || user.email)}</span>
+                      <span><strong>{user.displayName || "Account"}</strong><small>{user.email}</small></span>
+                    </div>
+                    <Link className="account-menu-item" href="/settings" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                      <Settings size={15} /><span>Settings</span><ArrowRight size={13} />
+                    </Link>
+                    <button className="account-menu-item account-menu-logout" type="button" role="menuitem" onClick={() => void handleLogOut()} disabled={loggingOut}>
+                      <LogOut size={15} /><span>{loggingOut ? "Signing out..." : "Log out"}</span>
+                      {loggingOut ? <span className="spinner" /> : <ArrowRight size={13} />}
+                    </button>
+                    {logoutError && <p className="account-menu-error" role="alert">{logoutError}</p>}
+                  </div>
+                )}
+              </div>
               <span className="user-chip">
                 <span className="avatar">{getInitials(user.displayName || user.email)}</span>
                 <span className="user-name">{user.displayName || "Account"}</span>
               </span>
-              <button className="text-button" onClick={() => void logOut()}>Log out</button>
             </>
           ) : (
             <>
               <Link className="text-button login-link" href="/login">Log in</Link>
               <Link className="primary-button create-account" href="/register">Create account <ArrowRight size={14} /></Link>
+              <div className="account-menu-wrap" ref={accountMenuRef}>
+                <button
+                  className="icon-button account-menu-trigger"
+                  type="button"
+                  aria-label="Open settings menu"
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  onClick={() => setAccountMenuOpen((open) => !open)}
+                >
+                  <Settings size={17} strokeWidth={1.9} />
+                </button>
+                {accountMenuOpen && (
+                  <div className="account-menu" role="menu" aria-label="Settings menu">
+                    <Link className="account-menu-item" href="/settings" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                      <Settings size={15} /><span>Settings</span><ArrowRight size={13} />
+                    </Link>
+                    <Link className="account-menu-item" href="/login" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
+                      <LogOut size={15} /><span>Log in</span><ArrowRight size={13} />
+                    </Link>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -908,6 +997,7 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [fixtureSearch, setFixtureSearch] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [saved, setSaved] = useState<string[]>([]);
   const [requestStatus, setRequestStatus] = useState("");
 
@@ -1037,6 +1127,7 @@ export default function DashboardPage() {
   const closeModal = useCallback(() => { setModal(null); setRequestStatus(""); }, []);
   const handleNavigation = (item: string) => {
     setMobileNavOpen(false);
+    setMobileActionsOpen(false);
     setActive(item);
     if (item.startsWith("league:")) {
       const id = item.slice("league:".length);
@@ -1047,6 +1138,11 @@ export default function DashboardPage() {
     if (item === "Home" || item === "Fixtures") {
       selectLeague(null);
       setStatusFilter("all");
+      document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (item === "LiveScore") {
+      setStatusFilter("live");
       document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
@@ -1075,6 +1171,29 @@ export default function DashboardPage() {
   };
 
   const openMatchCentre = (fixture: FixtureView) => { setSelectedFixture(fixture); setModal("match"); };
+  const openCurrentGame = () => {
+    setMobileActionsOpen(false);
+    setActive("Open Game");
+    const fixture = visibleFixtures.find((item) => item.status === "live" || item.status === "halftime")
+      ?? visibleFixtures[0]
+      ?? fixtures.find((item) => item.status === "live" || item.status === "halftime")
+      ?? fixtures[0];
+    if (fixture) {
+      openMatchCentre(fixture);
+      return;
+    }
+    setRequestStatus("There are no matches to open for the current filters.");
+    document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
+  };
+  const openMobileAction = (action: "analysis" | "saved") => {
+    setMobileActionsOpen(false);
+    if (action === "analysis") {
+      window.location.assign("/manual-analysis");
+      return;
+    }
+    if (user) window.location.assign("/account");
+    else setModal("auth");
+  };
   const handleSave = async (fixture: FixtureView) => {
     if (!user) { setSelectedFixture(fixture); setModal("auth"); return; }
     try {
@@ -1242,11 +1361,21 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation">
-        <button className={active === "Home" ? "active" : ""} onClick={() => handleNavigation("Home")}><Home size={16} />Home</button>
-        <button onClick={() => handleNavigation("Fixtures")}><CalendarDays size={16} />Fixtures</button>
-        <button onClick={() => setModal("automatic")}><Zap size={16} />Picks</button>
-        <button onClick={() => user ? window.location.assign("/account") : setModal("auth")}><UserRound size={16} />Account</button>
+      {mobileActionsOpen && (
+        <div className="mobile-action-menu" id="mobile-action-menu" role="group" aria-label="More MatchMetric actions">
+          <button type="button" onClick={() => openMobileAction("analysis")}><Target size={15} /><span>Manual analysis</span><ArrowRight size={13} /></button>
+          <button type="button" onClick={() => openMobileAction("saved")}><ShieldCheck size={15} /><span>Saved picks</span><ArrowRight size={13} /></button>
+        </div>
+      )}
+      <Link className="mobile-slip-tab" href="/manual-analysis" aria-label="Open match analysis slip" title="Build a match analysis slip">
+        <TicketCheck size={17} strokeWidth={1.9} /><span>Slip</span>
+      </Link>
+      <nav className="mobile-bottom-nav dashboard-mobile-nav" aria-label="Quick navigation">
+        <button className={active === "Home" ? "active" : ""} onClick={() => handleNavigation("Home")}><Home size={17} strokeWidth={1.9} /><span>Home</span></button>
+        <button className={active === "Automatic Picks" ? "active" : ""} onClick={() => { setMobileActionsOpen(false); setActive("Automatic Picks"); setModal("automatic"); }}><Zap size={17} strokeWidth={1.9} /><span>Automatic</span></button>
+        <button className={active === "LiveScore" || statusFilter === "live" ? "active" : ""} onClick={() => handleNavigation("LiveScore")}><Radio size={17} strokeWidth={1.9} /><span>LiveScore</span></button>
+        <button className={active === "Open Game" ? "active" : ""} onClick={openCurrentGame}><CirclePlay size={17} strokeWidth={1.9} /><span>Open Game</span></button>
+        <button className={active === "Action" ? "active" : ""} aria-expanded={mobileActionsOpen} aria-controls="mobile-action-menu" onClick={() => { setActive("Action"); setMobileActionsOpen((open) => !open); }}><Ellipsis size={19} strokeWidth={2} /><span>Action</span></button>
       </nav>
 
       {modal === "automatic" && <ModalShell title={title} description="Choose how you want a shortlist to be assembled." onClose={closeModal} wide><AutoPickForm fixtures={visibleFixtures} leagues={leagues} onSubmit={handleSubmit} />{requestStatus && <div className="notice success-notice" style={{ marginTop: 12 }}>{requestStatus}</div>}</ModalShell>}

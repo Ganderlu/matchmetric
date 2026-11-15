@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb, verifySessionCookie } from "@/lib/firebase-admin";
 import { generateManualPrediction, MANUAL_MODEL_VERSION } from "@/lib/football/manual-engine";
+import { recordRecommendation } from "@/lib/football/prediction-engine";
 import { getMatchCentre } from "@/lib/football/service";
 import type { ManualPredictionResult, SavedManualPrediction } from "@/lib/manual-predictions";
 import { consume, RateLimitError } from "@/lib/football/rate-limit";
@@ -147,7 +148,10 @@ export async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      results.push(generateManualPrediction(detail));
+      const prediction = generateManualPrediction(detail);
+      results.push(prediction);
+      // A saved pick is guaranteed to enter the tracked ledger even if analysis-time tracking failed.
+      await recordRecommendation({ result: prediction, source: match.source });
     }
 
     if (!results.some((result) => result.analysisStatus === "recommended")) {

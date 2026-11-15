@@ -209,6 +209,35 @@ export async function getMatchCentre(fixtureId: string): Promise<MatchCentreResu
   }
 }
 
+/**
+ * A lightweight single-fixture lookup used by accuracy tracking.
+ *
+ * It deliberately skips the full match centre (form, head-to-head, odds), so grading a
+ * finished pick costs one provider read rather than five.
+ */
+export async function getFixtureById(
+  fixtureId: string,
+): Promise<{ fixture: Fixture | null; source: DataSource }> {
+  const separator = fixtureId.indexOf(":");
+  const prefix = separator > 0 ? fixtureId.slice(0, separator) : "";
+  const providerFixtureId = separator > 0 ? fixtureId.slice(separator + 1) : "";
+
+  if (!prefix || !providerFixtureId) return { fixture: null, source: "unconfigured" };
+
+  if (prefix === "demo") {
+    return { fixture: await createDemoProvider().getFixture(providerFixtureId), source: "demo" };
+  }
+
+  const { provider, source } = activeProvider();
+  if (source !== "provider" || provider.name !== prefix) return { fixture: null, source };
+
+  try {
+    return { fixture: await provider.getFixture(providerFixtureId), source: "provider" };
+  } catch {
+    return { fixture: null, source };
+  }
+}
+
 /** Attach the labelled mock preview to a demo fixture card. */
 function mockView(fixture: Fixture, source: DataSource): FixtureView {
   const preview = demoPreview(fixture.id);

@@ -35,7 +35,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Reserved for the prediction engine; nothing writes to these yet.
+    // Prediction engine ledger: `predictions` holds a recommendation recorded before
+    // kickoff, `prediction_results` holds its graded outcome. Both are written and read
+    // only by the server (Admin SDK, which bypasses these rules) through the gated
+    // accuracy route, so they stay closed to clients.
     match /predictions/{docId} {
       allow read, write: if false;
     }
