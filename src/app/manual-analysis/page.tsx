@@ -191,6 +191,7 @@ export default function ManualAnalysisPage() {
   const [failed, setFailed] = useState<Record<string, string>>({});
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const analysisInFlight = useRef(false);
+  const autoAnalyzeRequested = useRef(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, fixtureName: "" });
   const [authModal, setAuthModal] = useState<"analysis" | "save" | null>(null);
   const authCloseButton = useRef<HTMLButtonElement>(null);
@@ -210,6 +211,8 @@ export default function ManualAnalysisPage() {
     const start = new Date();
     const from = localDayKey(start);
     const to = localDayKey(addDays(start, ANALYSIS_WINDOW_DAYS));
+    autoAnalyzeRequested.current = sessionStorage.getItem("matchmetric:manual-auto-analyze") === "1";
+    sessionStorage.removeItem("matchmetric:manual-auto-analyze");
     try {
       const [leagueResponse, feed] = await Promise.all([
         fetchLeagues(signal),
@@ -298,7 +301,7 @@ export default function ManualAnalysisPage() {
     }
   };
 
-  const runAnalysis = async (ids: string[]) => {
+  const runAnalysis = useCallback(async (ids: string[]) => {
     if (!ids.length || analysisInFlight.current) return;
     if (!user) {
       sessionStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(selectedIds));
@@ -351,7 +354,13 @@ export default function ManualAnalysisPage() {
       analysisInFlight.current = false;
       setAnalysisBusy(false);
     }
-  };
+  }, [fixtures, selectedIds, user]);
+
+  useEffect(() => {
+    if (!autoAnalyzeRequested.current || loadingFixtures || authLoading) return;
+    autoAnalyzeRequested.current = false;
+    if (selectedIds.length) void runAnalysis(selectedIds);
+  }, [authLoading, loadingFixtures, runAnalysis, selectedIds]);
 
   const savePredictions = async () => {
     if (!user) {

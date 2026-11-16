@@ -10,11 +10,7 @@ import {
   CalendarDays,
   Camera,
   Check,
-  ChevronLeft,
-  ChevronRight,
-  CirclePlay,
   Clock3,
-  Ellipsis,
   FileImage,
   Goal,
   Home,
@@ -22,14 +18,11 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  RefreshCw,
-  Radio,
   Search,
   Settings,
   ShieldCheck,
   Shirt,
   Target,
-  TicketCheck,
   TrendingUp,
   Trophy,
   Upload,
@@ -49,6 +42,13 @@ import {
   type FormEvent,
 } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { BottomNavigation } from "@/components/mobile/BottomNavigation";
+import { FloatingSlip } from "@/components/mobile/FloatingSlip";
+import { HotPicks } from "@/components/mobile/HotPicks";
+import { MobileHeader } from "@/components/mobile/MobileHeader";
+import { SportLeagueFilters } from "@/components/mobile/SportLeagueFilters";
+import { TodaysFixtures } from "@/components/mobile/TodaysFixtures";
+import { TopLeagues } from "@/components/mobile/TopLeagues";
 import { fetchFixtureFeed, fetchLeagues, fetchMatchCentre } from "@/lib/football-client";
 import { marketCategories, marketCategoryOrder } from "@/lib/football/markets";
 import type { DataSource, MatchEventType, TeamStatisticField } from "@/lib/football/types";
@@ -992,12 +992,12 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [active, setActive] = useState("Home");
   const [modal, setModal] = useState<ModalKind>(null);
-  const [search, setSearch] = useState("");
+  const [search] = useState("");
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [fixtureSearch, setFixtureSearch] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [saved, setSaved] = useState<string[]>([]);
   const [requestStatus, setRequestStatus] = useState("");
 
@@ -1121,29 +1121,24 @@ export default function DashboardPage() {
     });
   }, [fixtures, dayKey, statusFilter, search, fixtureSearch]);
 
-  const changeDay = (next: string) => { setPage(1); setDayKey(next); };
   const selectLeague = (next: string | null) => { setPage(1); setLeagueId(next); };
 
   const closeModal = useCallback(() => { setModal(null); setRequestStatus(""); }, []);
   const handleNavigation = (item: string) => {
     setMobileNavOpen(false);
-    setMobileActionsOpen(false);
     setActive(item);
     if (item.startsWith("league:")) {
       const id = item.slice("league:".length);
       selectLeague(id);
-      document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
     if (item === "Home" || item === "Fixtures") {
       selectLeague(null);
       setStatusFilter("all");
-      document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
     if (item === "LiveScore") {
       setStatusFilter("live");
-      document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
     if (item === "Manual Analysis") {
@@ -1171,48 +1166,6 @@ export default function DashboardPage() {
   };
 
   const openMatchCentre = (fixture: FixtureView) => { setSelectedFixture(fixture); setModal("match"); };
-  const openCurrentGame = () => {
-    setMobileActionsOpen(false);
-    setActive("Open Game");
-    const fixture = visibleFixtures.find((item) => item.status === "live" || item.status === "halftime")
-      ?? visibleFixtures[0]
-      ?? fixtures.find((item) => item.status === "live" || item.status === "halftime")
-      ?? fixtures[0];
-    if (fixture) {
-      openMatchCentre(fixture);
-      return;
-    }
-    setRequestStatus("There are no matches to open for the current filters.");
-    document.getElementById("fixtures")?.scrollIntoView({ behavior: "smooth" });
-  };
-  const openMobileAction = (action: "analysis" | "saved") => {
-    setMobileActionsOpen(false);
-    if (action === "analysis") {
-      window.location.assign("/manual-analysis");
-      return;
-    }
-    if (user) window.location.assign("/account");
-    else setModal("auth");
-  };
-  const handleSave = async (fixture: FixtureView) => {
-    if (!user) { setSelectedFixture(fixture); setModal("auth"); return; }
-    try {
-      if (saved.includes(fixture.id)) {
-        await removeSavedFixture(user.uid, fixture.id);
-        setSaved((current) => current.filter((id) => id !== fixture.id));
-        setRequestStatus(`${fixture.home.name} vs ${fixture.away.name} removed from saved picks.`);
-      } else {
-        await saveFixture(user.uid, fixture);
-        setSaved((current) => [...current, fixture.id]);
-        setRequestStatus(`${fixture.home.name} vs ${fixture.away.name} saved to your account.`);
-      }
-    } catch {
-      setRequestStatus("Saved picks are unavailable. Check that Cloud Firestore is enabled and its security rules are deployed.");
-    }
-  };
-
-  const isToday = Boolean(dayKey && todayKey && dayKey === todayKey);
-  const headingTitle = isToday ? "Today's Football" : dayKey ? `Football · ${shortDayFormatter.format(parseDayKey(dayKey))}` : "Football";
 
   const title = modal === "automatic" ? "Automatic picks"
     : modal === "manual" ? "Manual match analysis"
@@ -1229,154 +1182,51 @@ export default function DashboardPage() {
     ]
     : [];
 
+  const featuredFixture = visibleFixtures.find((f) => f.status !== "finished") ?? visibleFixtures[0] ?? null;
+
+  const leagueOptions = leagues.map((league) => ({
+    id: league.id,
+    name: league.name,
+    available: league.available,
+  }));
+
   return (
     <>
-      <AppHeader onMenu={() => setMobileNavOpen((open) => !open)} onSearch={setSearch} onHow={() => setModal("how")} />
-      {mobileNavOpen && <button aria-label="Close navigation" className="mobile-sidebar-overlay" onClick={() => setMobileNavOpen(false)} />}
-      <div className="app-layout">
+      <div className="app-layout mm-app-layout">
         <Sidebar active={active} onNavigate={handleNavigation} open={mobileNavOpen} leagues={leagues} />
-        <main className="dashboard">
-          <div className="main-column">
-            <div className="dashboard-heading">
-              <div>
-                <div className="eyebrow">Matchday overview</div>
-                <h1>{headingTitle}</h1>
-                <p className="heading-subtitle">Fixtures, kick-off times and match details in your timezone.</p>
-              </div>
-              <div className="date-chip">
-                <CalendarDays size={14} />
-                {dayKey ? shortDayFormatter.format(parseDayKey(dayKey)) : ""}
-              </div>
+        <div className="mm-main-wrap">
+          <MobileHeader />
+          {requestStatus && <div className="notice success-notice mm-notice" role="status">{requestStatus}</div>}
+          {feedNotice && <div className="notice mm-notice">{feedNotice}</div>}
+          {feedError && (
+            <div className="notice error-notice mm-notice">
+              {feedError}
+              <button className="text-button" onClick={() => { setPage(1); setReloadToken((token) => token + 1); }}>Try again</button>
             </div>
-            {requestStatus && <div className="notice success-notice" role="status" style={{ marginBottom: 13 }}>{requestStatus}</div>}
-
-            <div className="date-nav">
-              {todayKey && dayKey && (
-                <>
-                  <button className="icon-button" aria-label="Previous day" onClick={() => changeDay(shiftDayKey(dayKey, -1))}><ChevronLeft size={16} /></button>
-                  <div className="date-nav-chips">
-                    {dayChips.map((chip) => (
-                      <button
-                        key={chip.key}
-                        className={`day-chip ${dayKey === chip.key ? "active" : ""}`}
-                        onClick={() => changeDay(chip.key)}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    className="day-input"
-                    type="date"
-                    aria-label="Choose a date"
-                    value={dayKey}
-                    onChange={(event) => { if (event.target.value) changeDay(event.target.value); }}
-                  />
-                  <button className="icon-button" aria-label="Next day" onClick={() => changeDay(shiftDayKey(dayKey, 1))}><ChevronRight size={16} /></button>
-                  <button
-                    className="icon-button"
-                    aria-label="Refresh fixtures"
-                    onClick={() => { setPage(1); setReloadToken((token) => token + 1); }}
-                  >
-                    <RefreshCw size={15} />
-                  </button>
-                  <span className="field-help">Times shown in {getTimeZone()}</span>
-                </>
-              )}
-            </div>
-
-            <div className="section-toolbar" id="fixtures">
-              <h2 className="section-title">
-                <span className="league-dot" /> Fixtures
-                <span style={{ color: "#738297", fontSize: 10, fontWeight: 500 }}>({visibleFixtures.length})</span>
-                {feedSource && <span className="demo-label">{SOURCE_LABEL[feedSource]}</span>}
-              </h2>
-              <div className="toolbar-controls">
-                <label className="filter-search">
-                  <Search size={13} style={{ verticalAlign: "-2px", marginRight: 6, color: "#718095" }} />
-                  <input
-                    aria-label="Search fixtures"
-                    value={fixtureSearch}
-                    onChange={(event) => setFixtureSearch(event.target.value)}
-                    placeholder="Find a match"
-                    style={{ width: "calc(100% - 22px)", border: 0, outline: 0, color: "var(--text)", background: "transparent" }}
-                  />
-                </label>
-                <select
-                  className="select-control"
-                  aria-label="Filter by league"
-                  value={leagueId ?? ""}
-                  onChange={(event) => selectLeague(event.target.value || null)}
-                >
-                  <option value="">All leagues</option>
-                  {leagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
-                </select>
-                <select
-                  className="select-control"
-                  aria-label="Filter by status"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                >
-                  {STATUS_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {feedNotice && <div className="notice" style={{ marginBottom: 11 }}>{feedNotice}</div>}
-            {feedError && (
-              <div className="notice error-notice" style={{ marginBottom: 11 }}>
-                {feedError}
-                <button className="text-button" onClick={() => { setPage(1); setReloadToken((token) => token + 1); }}>Try again</button>
-              </div>
-            )}
-
-            {loading && page === 1 && !fixtures.length ? (
-              <FixtureSkeletons />
-            ) : visibleFixtures.length ? (
-              <div className="fixture-stack">
-                {visibleFixtures.map((fixture) => (
-                  <FixtureCard
-                    key={fixture.id}
-                    fixture={fixture}
-                    onMatchCentre={openMatchCentre}
-                    onSave={handleSave}
-                    isSaved={saved.includes(fixture.id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <strong>No fixtures to show</strong>
-                {fixtures.length
-                  ? "No fixture matches these filters. Try another league, status or search term."
-                  : "No fixtures are available for this date from the connected provider."}
-              </div>
-            )}
-
+          )}
+          <main className="mm-main">
+            <SportLeagueFilters
+              leagues={leagueOptions}
+              selectedLeagueId={leagueId}
+              onLeagueChange={selectLeague}
+              searchOpen={mobileSearchOpen}
+              onToggleSearch={() => setMobileSearchOpen((open) => !open)}
+              searchQuery={fixtureSearch}
+              onSearchChange={setFixtureSearch}
+            />
+            <HotPicks featured={featuredFixture} onOpenMatch={openMatchCentre} />
+            <TopLeagues leagues={leagues} selectedLeagueId={leagueId} onSelectLeague={selectLeague} />
+            <TodaysFixtures fixtures={visibleFixtures} onOpenMatch={openMatchCentre} />
             {hasMore && (
               <button className="outline-button load-more" onClick={() => setPage((current) => current + 1)} disabled={loading}>
                 {loading ? <><span className="spinner" /> Loading</> : <>Load more fixtures <ArrowRight size={12} /></>}
               </button>
             )}
-          </div>
-        </main>
-      </div>
-      {mobileActionsOpen && (
-        <div className="mobile-action-menu" id="mobile-action-menu" role="group" aria-label="More MatchMetric actions">
-          <button type="button" onClick={() => openMobileAction("analysis")}><Target size={15} /><span>Manual analysis</span><ArrowRight size={13} /></button>
-          <button type="button" onClick={() => openMobileAction("saved")}><ShieldCheck size={15} /><span>Saved picks</span><ArrowRight size={13} /></button>
+          </main>
         </div>
-      )}
-      <Link className="mobile-slip-tab" href="/manual-analysis" aria-label="Open match analysis slip" title="Build a match analysis slip">
-        <TicketCheck size={17} strokeWidth={1.9} /><span>Slip</span>
-      </Link>
-      <nav className="mobile-bottom-nav dashboard-mobile-nav" aria-label="Quick navigation">
-        <button className={active === "Home" ? "active" : ""} onClick={() => handleNavigation("Home")}><Home size={17} strokeWidth={1.9} /><span>Home</span></button>
-        <button className={active === "Automatic Picks" ? "active" : ""} onClick={() => { setMobileActionsOpen(false); setActive("Automatic Picks"); setModal("automatic"); }}><Zap size={17} strokeWidth={1.9} /><span>Automatic</span></button>
-        <button className={active === "LiveScore" || statusFilter === "live" ? "active" : ""} onClick={() => handleNavigation("LiveScore")}><Radio size={17} strokeWidth={1.9} /><span>LiveScore</span></button>
-        <button className={active === "Open Game" ? "active" : ""} onClick={openCurrentGame}><CirclePlay size={17} strokeWidth={1.9} /><span>Open Game</span></button>
-        <button className={active === "Action" ? "active" : ""} aria-expanded={mobileActionsOpen} aria-controls="mobile-action-menu" onClick={() => { setActive("Action"); setMobileActionsOpen((open) => !open); }}><Ellipsis size={19} strokeWidth={2} /><span>Action</span></button>
-      </nav>
+      </div>
+      <FloatingSlip />
+      <BottomNavigation />
 
       {modal === "automatic" && <ModalShell title={title} description="Choose how you want a shortlist to be assembled." onClose={closeModal} wide><AutoPickForm fixtures={visibleFixtures} leagues={leagues} onSubmit={handleSubmit} />{requestStatus && <div className="notice success-notice" style={{ marginTop: 12 }}>{requestStatus}</div>}</ModalShell>}
       {modal === "manual" && <ModalShell title={title} description="Compare the fixtures loaded for this date." onClose={closeModal} wide><ManualAnalysisForm fixtures={visibleFixtures} onSubmit={handleSubmit} onPublicPreview={openMatchCentre} />{requestStatus && <div className="notice success-notice" style={{ marginTop: 12 }}>{requestStatus}</div>}</ModalShell>}
