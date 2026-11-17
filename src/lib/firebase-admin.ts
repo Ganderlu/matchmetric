@@ -48,3 +48,30 @@ export async function verifySessionCookie(cookie: string) {
   if (!auth) return null;
   return auth.verifySessionCookie(cookie, true);
 }
+
+export async function verifyIdToken(idToken: string) {
+  const auth = getAdminAuth();
+  if (!auth) return null;
+  return auth.verifyIdToken(idToken);
+}
+
+/**
+ * Permanently remove a member: their private `users/{uid}` tree in Firestore and their
+ * Firebase Authentication record. Storage cleanup is best-effort because a private
+ * profile picture is the only object the app ever writes for a member.
+ */
+export async function deleteAccountData(uid: string): Promise<void> {
+  const db = getAdminDb();
+  if (db) {
+    await db.recursiveDelete(db.doc(`users/${uid}`));
+  }
+
+  const auth = getAdminAuth();
+  if (!auth) return;
+  try {
+    await auth.deleteUser(uid);
+  } catch (error) {
+    if ((error as { code?: string }).code !== "auth/user-not-found") throw error;
+  }
+}
+
