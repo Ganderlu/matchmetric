@@ -270,9 +270,6 @@ function AppHeader({
                       <span className="avatar">{getInitials(user.displayName || user.email)}</span>
                       <span><strong>{user.displayName || "Account"}</strong><small>{user.email}</small></span>
                     </div>
-                    <Link className="account-menu-item" href="/settings" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
-                      <Settings size={15} /><span>Settings</span><ArrowRight size={13} />
-                    </Link>
                     <button className="account-menu-item account-menu-logout" type="button" role="menuitem" onClick={() => void handleLogOut()} disabled={loggingOut}>
                       <LogOut size={15} /><span>{loggingOut ? "Signing out..." : "Log out"}</span>
                       {loggingOut ? <span className="spinner" /> : <ArrowRight size={13} />}
@@ -302,10 +299,7 @@ function AppHeader({
                   <Settings size={17} strokeWidth={1.9} />
                 </button>
                 {accountMenuOpen && (
-                  <div className="account-menu" role="menu" aria-label="Settings menu">
-                    <Link className="account-menu-item" href="/settings" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
-                      <Settings size={15} /><span>Settings</span><ArrowRight size={13} />
-                    </Link>
+                  <div className="account-menu" role="menu" aria-label="Account menu">
                     <Link className="account-menu-item" href="/login" role="menuitem" onClick={() => setAccountMenuOpen(false)}>
                       <LogOut size={15} /><span>Log in</span><ArrowRight size={13} />
                     </Link>

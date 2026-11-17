@@ -22,7 +22,6 @@ import {
   LockKeyhole,
   LogOut,
   Search,
-  Settings,
   Sparkles,
   Target,
   Trash2,
@@ -136,7 +135,6 @@ function ManualSidebar({
         <Link className="nav-item" href="/account"><BookMarked size={16} /><span>Saved Picks</span></Link>
         <Link className="nav-item" href="/account"><Clock3 size={16} /><span>Prediction History</span></Link>
         <Link className="nav-item" href="/account"><BarChart3 size={16} /><span>Performance Statistics</span></Link>
-        <Link className="nav-item" href="/settings"><Settings size={16} /><span>Settings</span></Link>
       </div>
       <div className="nav-group">
         <p className="nav-label">LEAGUES</p>

@@ -1,9 +1,8 @@
 "use client";
 
-import { Bell, Settings as SettingsIcon } from "lucide-react";
-import Link from "next/link";
+import { Bell } from "lucide-react";
 
-/** Page-level header: title, a settings shortcut and a notifications shortcut. */
+/** Page-level header: title and a notifications shortcut. */
 export function ProfileHeader({ onNotifications }: { onNotifications: () => void }) {
   return (
     <header className="profile-head">
@@ -21,9 +20,6 @@ export function ProfileHeader({ onNotifications }: { onNotifications: () => void
         >
           <Bell size={19} strokeWidth={1.9} />
         </button>
-        <Link className="profile-icon-button" href="/settings" aria-label="Open advanced settings">
-          <SettingsIcon size={19} strokeWidth={1.9} />
-        </Link>
       </div>
     </header>
   );

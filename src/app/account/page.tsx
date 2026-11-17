@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Settings, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SavedPredictions } from "./saved-predictions";
 import { ModelAccuracy } from "./performance";
 
@@ -15,7 +15,6 @@ export default function AccountPage() {
         <ModelAccuracy />
         <SavedPredictions />
         <div className="account-actions">
-          <Link className="outline-button" href="/settings"><Settings size={14} /> Settings</Link>
           <Link className="primary-button" href="/">Return to dashboard <ArrowLeft size={14} /></Link>
         </div>
       </div>
