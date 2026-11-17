@@ -3,6 +3,7 @@
 import { CalendarDays, ChevronRight, Plus, TrendingUp } from "lucide-react";
 import type { FixtureView } from "@/lib/football/views";
 import { useSlip } from "@/context/SlipContext";
+import { entryFromFixture } from "@/lib/slip-analysis";
 
 function TeamBadge({ team }: { team: FixtureView["home"] }) {
   if (team.logoUrl) {
@@ -33,14 +34,7 @@ function MatchCard({ fixture, onOpenMatch }: MatchCardProps) {
       removeEntry(fixture.id);
       return;
     }
-    addEntry({
-      fixtureId: fixture.id,
-      homeTeam: fixture.home.name,
-      awayTeam: fixture.away.name,
-      competition: fixture.league.name,
-      kickoff: fixture.kickoff,
-      source: "manual",
-    });
+    addEntry(entryFromFixture(fixture, "manual"));
   };
 
   const time = new Date(fixture.kickoff);

@@ -61,7 +61,24 @@ export interface SavedManualPrediction {
   id: string;
   fixtureIds: string[];
   results: ManualPredictionResult[];
+  /** The user's final choice per fixture, kept apart from the engine's recommendation. */
+  selections?: SavedSelectionRecord[];
   modelVersion: string;
   generatedAt: string;
   createdAt: string;
+}
+
+/**
+ * The selection the user settled on when saving, with the method it came from.
+ *
+ * It is recorded alongside the engine's own `results` rather than replacing them, so the
+ * ledger can always tell the recommendation and the user's final choice apart.
+ */
+export interface SavedSelectionRecord {
+  fixtureId: string;
+  market: string;
+  selection: string;
+  source: "manual" | "automatic" | "screenshot";
+  odds?: number;
+  probability?: number;
 }

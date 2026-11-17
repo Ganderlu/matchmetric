@@ -3,6 +3,7 @@
 import { CheckCircle2, ChevronRight, Flame, Plus, TrendingUp } from "lucide-react";
 import type { FixtureView } from "@/lib/football/views";
 import { useSlip } from "@/context/SlipContext";
+import { entryFromFixture } from "@/lib/slip-analysis";
 
 function TeamBadge({ team }: { team: FixtureView["home"] }) {
   if (team.logoUrl) {
@@ -31,14 +32,7 @@ export function HotPicks({ featured, onOpenMatch }: HotPicksProps) {
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (inSlip) return;
-    addEntry({
-      fixtureId: featured.id,
-      homeTeam: featured.home.name,
-      awayTeam: featured.away.name,
-      competition: featured.league.name,
-      kickoff: featured.kickoff,
-      source: "manual",
-    });
+    addEntry(entryFromFixture(featured, "manual"));
   };
 
   const time = new Date(featured.kickoff);

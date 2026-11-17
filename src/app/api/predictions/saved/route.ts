@@ -4,7 +4,11 @@ import { getAdminDb, verifySessionCookie } from "@/lib/firebase-admin";
 import { generateManualPrediction, MANUAL_MODEL_VERSION } from "@/lib/football/manual-engine";
 import { recordRecommendation } from "@/lib/football/prediction-engine";
 import { getMatchCentre } from "@/lib/football/service";
-import type { ManualPredictionResult, SavedManualPrediction } from "@/lib/manual-predictions";
+import type {
+  ManualPredictionResult,
+  SavedManualPrediction,
+  SavedSelectionRecord,
+} from "@/lib/manual-predictions";
 import { consume, RateLimitError } from "@/lib/football/rate-limit";
 
 export const runtime = "nodejs";
@@ -12,6 +16,42 @@ export const dynamic = "force-dynamic";
 
 const FIXTURE_ID = /^(sportmonks|api-football):[A-Za-z0-9_-]+$/;
 const MAX_FIXTURES = 5;
+const SELECTION_SOURCES = new Set(["manual", "automatic", "screenshot"]);
+
+/**
+ * Validate the caller's own selection for a saved pick.
+ *
+ * This is the user's final choice, kept separate from the engine result: only the shape is
+ * checked here, never the value. A selection that does not belong to a fixture being saved is
+ * dropped rather than trusted.
+ */
+function parseSelections(value: unknown, fixtureIds: Set<string>): SavedSelectionRecord[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_FIXTURES) return null;
+
+  const records: SavedSelectionRecord[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const candidate = entry as Record<string, unknown>;
+    const { fixtureId, market, selection, source, odds, probability } = candidate;
+    if (typeof fixtureId !== "string" || !fixtureIds.has(fixtureId)) return null;
+    if (typeof market !== "string" || !market.trim() || market.length > 120) return null;
+    if (typeof selection !== "string" || !selection.trim() || selection.length > 120) return null;
+    if (typeof source !== "string" || !SELECTION_SOURCES.has(source)) return null;
+    if (odds !== undefined && (typeof odds !== "number" || !Number.isFinite(odds))) return null;
+    if (probability !== undefined && (typeof probability !== "number" || !Number.isFinite(probability))) return null;
+
+    records.push({
+      fixtureId,
+      market: market.trim(),
+      selection: selection.trim(),
+      source: source as SavedSelectionRecord["source"],
+      odds: typeof odds === "number" ? odds : undefined,
+      probability: typeof probability === "number" ? probability : undefined,
+    });
+  }
+  return records;
+}
 
 async function authenticatedUid(request: NextRequest) {
   const session = request.cookies.get("__session")?.value;
@@ -60,6 +100,7 @@ export async function GET(request: NextRequest) {
         id: entry.id,
         fixtureIds: Array.isArray(data.fixtureIds) ? data.fixtureIds : [],
         results: Array.isArray(data.results) ? data.results : [],
+        selections: Array.isArray(data.selections) ? data.selections : undefined,
         modelVersion: typeof data.modelVersion === "string" ? data.modelVersion : MANUAL_MODEL_VERSION,
         generatedAt: typeof data.generatedAt === "string" ? data.generatedAt : "",
         createdAt: createdAt instanceof Date ? createdAt.toISOString() : "",
@@ -108,9 +149,9 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  let body: { fixtureIds?: unknown };
+  let body: { fixtureIds?: unknown; selections?: unknown };
   try {
-    body = (await request.json()) as { fixtureIds?: unknown };
+    body = (await request.json()) as { fixtureIds?: unknown; selections?: unknown };
   } catch {
     return NextResponse.json({ error: "A valid JSON request body is required." }, { status: 400 });
   }
@@ -124,6 +165,14 @@ export async function POST(request: NextRequest) {
     new Set(fixtureIds).size !== fixtureIds.length
   ) {
     return NextResponse.json({ error: "Select between one and five unique real-provider fixtures." }, { status: 400 });
+  }
+
+  const selections = parseSelections(body.selections, new Set(fixtureIds as string[]));
+  if (body.selections !== undefined && selections === null) {
+    return NextResponse.json(
+      { error: "Each saved selection must name a fixture being saved and a market and outcome." },
+      { status: 400 },
+    );
   }
 
   const db = getAdminDb();
@@ -166,6 +215,8 @@ export async function POST(request: NextRequest) {
     await record.set({
       fixtureIds,
       results,
+      // Kept next to the engine results so the recommendation and the user's choice stay distinct.
+      ...(selections ? { selections } : {}),
       modelVersion: MANUAL_MODEL_VERSION,
       generatedAt,
       createdAt: FieldValue.serverTimestamp(),
@@ -175,6 +226,7 @@ export async function POST(request: NextRequest) {
       id: record.id,
       fixtureIds: fixtureIds as string[],
       results,
+      selections: selections ?? undefined,
       modelVersion: MANUAL_MODEL_VERSION,
       generatedAt,
       createdAt: generatedAt,

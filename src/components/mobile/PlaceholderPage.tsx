@@ -3,8 +3,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { BottomNavigation } from "@/components/mobile/BottomNavigation";
-import { FloatingSlip } from "@/components/mobile/FloatingSlip";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
+import { ExpandedSlip } from "@/components/slip/ExpandedSlip";
+import { FloatingSlipButton } from "@/components/slip/FloatingSlipButton";
 
 interface PlaceholderPageProps {
   icon: ReactNode;
@@ -24,7 +25,8 @@ export function PlaceholderPage({ icon, title, description }: PlaceholderPagePro
           <Link className="mm-placeholder-link" href="/">Back to Home</Link>
         </div>
       </main>
-      <FloatingSlip />
+      <FloatingSlipButton />
+      <ExpandedSlip />
       <BottomNavigation />
     </div>
   );

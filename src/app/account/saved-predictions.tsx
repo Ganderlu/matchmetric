@@ -42,13 +42,32 @@ export function SavedPredictions() {
                 <small>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString() : "Saved"}</small>
               </div>
               <div className="saved-prediction-picks">
-                {prediction.results.map((result) => (
-                  <div className="saved-prediction-pick" key={result.fixtureId}>
-                    <span>{result.homeTeam.name} vs {result.awayTeam.name}</span>
-                    <strong>{result.recommendedSelection ?? (result.analysisStatus === "insufficient" ? "Insufficient data" : "No positive value")}</strong>
-                    {result.estimatedProbability !== null && <small>{result.estimatedProbability.toFixed(1)}% · {result.marketLabel}</small>}
-                  </div>
-                ))}
+                {prediction.results.map((result) => {
+                  const chosen = prediction.selections?.find(
+                    (selection) => selection.fixtureId === result.fixtureId,
+                  );
+                  const recommendation =
+                    result.recommendedSelection ??
+                    (result.analysisStatus === "insufficient" ? "Insufficient data" : "No positive value");
+                  const replaced = chosen && chosen.selection !== recommendation;
+                  return (
+                    <div className="saved-prediction-pick" key={result.fixtureId}>
+                      <span>{result.homeTeam.name} vs {result.awayTeam.name}</span>
+                      <strong>{chosen ? `${chosen.market} — ${chosen.selection}` : recommendation}</strong>
+                      {chosen ? (
+                        <small>
+                          Your {chosen.source} selection
+                          {typeof chosen.odds === "number" ? ` @ ${chosen.odds.toFixed(2)}` : ""}
+                        </small>
+                      ) : (
+                        result.estimatedProbability !== null && (
+                          <small>{result.estimatedProbability.toFixed(1)}% · {result.marketLabel}</small>
+                        )
+                      )}
+                      {replaced && <small>MatchMetric suggested {recommendation}</small>}
+                    </div>
+                  );
+                })}
               </div>
               <small className="saved-model-version">Model {prediction.modelVersion}</small>
             </article>

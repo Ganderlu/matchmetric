@@ -43,12 +43,13 @@ import {
 } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { BottomNavigation } from "@/components/mobile/BottomNavigation";
-import { FloatingSlip } from "@/components/mobile/FloatingSlip";
 import { HotPicks } from "@/components/mobile/HotPicks";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { SportLeagueFilters } from "@/components/mobile/SportLeagueFilters";
 import { TodaysFixtures } from "@/components/mobile/TodaysFixtures";
 import { TopLeagues } from "@/components/mobile/TopLeagues";
+import { ExpandedSlip } from "@/components/slip/ExpandedSlip";
+import { FloatingSlipButton } from "@/components/slip/FloatingSlipButton";
 import { fetchFixtureFeed, fetchLeagues, fetchMatchCentre } from "@/lib/football-client";
 import { marketCategories, marketCategoryOrder } from "@/lib/football/markets";
 import type { DataSource, MatchEventType, TeamStatisticField } from "@/lib/football/types";
@@ -1225,7 +1226,8 @@ export default function DashboardPage() {
           </main>
         </div>
       </div>
-      <FloatingSlip />
+      <FloatingSlipButton />
+      <ExpandedSlip />
       <BottomNavigation />
 
       {modal === "automatic" && <ModalShell title={title} description="Choose how you want a shortlist to be assembled." onClose={closeModal} wide><AutoPickForm fixtures={visibleFixtures} leagues={leagues} onSubmit={handleSubmit} />{requestStatus && <div className="notice success-notice" style={{ marginTop: 12 }}>{requestStatus}</div>}</ModalShell>}
