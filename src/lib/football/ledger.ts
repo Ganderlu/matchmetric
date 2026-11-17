@@ -7,9 +7,13 @@ import { marketCategories } from "@/lib/football/markets";
 import type { MarketCategoryKey } from "@/lib/football/types";
 import type {
   ManualPredictionResult,
+  PredictionAnalysisStatus,
+  PredictionConfidence,
+  PredictionDataQuality,
   SavedSelectionRecord,
   SettlementTarget,
 } from "@/lib/manual-predictions";
+import type { SelectionSource } from "@/types/slip";
 
 /**
  * Shared access to the graded prediction ledger.
@@ -99,6 +103,138 @@ export function gradeLeg(settlement: SettlementTarget | null, ledger: GradedFixt
   if (ledger.outcome === "void") return "void";
   if (ledger.homeScore === null || ledger.awayScore === null) return "open";
   return gradeSettlement(settlement, ledger.homeScore, ledger.awayScore);
+}
+
+/* ------------------------------------------------------------------ snapshots */
+
+/**
+ * The recorded shapes both the completed record (History) and the live record (Open Games)
+ * present. They are declared once so the two pages can never describe the same saved entry
+ * differently, and nothing here is ever recalculated after the fact.
+ */
+
+/** The engine's recommendation as it was recorded, never rewritten. */
+export interface PredictionRecommendation {
+  marketKey: MarketCategoryKey | null;
+  marketLabel: string;
+  selection: string;
+  estimatedProbability: number | null;
+  /** The odds the engine recorded for its recommendation at analysis time. */
+  odds: number | null;
+  generatedAt: string;
+}
+
+/** The selection that was actually saved, with the values recorded at that moment. */
+export interface PredictionFinalSelection {
+  marketLabel: string;
+  selection: string;
+  /** Odds exactly as recorded when the entry was saved, or null when none were stored. */
+  odds: number | null;
+  /** Estimated probability exactly as recorded when the entry was saved, or null. */
+  probability: number | null;
+  source: SelectionSource | "unknown";
+}
+
+/** The analysis snapshot preserved alongside a recommendation. */
+export interface PredictionAnalysis {
+  status: PredictionAnalysisStatus | null;
+  confidence: PredictionConfidence | null;
+  dataQuality: PredictionDataQuality | null;
+  estimatedProbability: number | null;
+  availableOdds: number | null;
+  homeForm: string;
+  awayForm: string;
+  keyInsights: string[];
+  weakeningFactors: string[];
+}
+
+/** A saved selection resolved to the market and grading target it belongs to. */
+export interface ResolvedSelection {
+  /** Null when no canonical target could be resolved; callers report that as unevaluable. */
+  settlement: SettlementTarget | null;
+  marketKey: MarketCategoryKey | "other";
+  marketLabel: string;
+  selection: string;
+}
+
+/**
+ * Resolve one saved selection to the market it belongs to.
+ *
+ * The member's own recorded choice wins when they made one; otherwise the engine's
+ * recommendation is used. Nothing is inferred beyond what was stored.
+ */
+export function resolveSelection(
+  result: ManualPredictionResult,
+  recorded: SavedSelectionRecord | null,
+): ResolvedSelection {
+  const resolved = recorded ? resolveRecordedPick(result, recorded) : null;
+  return {
+    settlement: recorded ? resolved?.settlement ?? null : result.recommendedSettlement,
+    marketKey: recorded ? resolved?.category ?? "other" : result.recommendedMarket ?? "other",
+    marketLabel: recorded
+      ? resolved?.category
+        ? marketCategories[resolved.category].label
+        : recorded.market
+      : result.marketLabel ?? marketCategories[result.recommendedMarket ?? "match-winner"].label,
+    selection: recorded ? recorded.selection : result.recommendedSelection ?? "",
+  };
+}
+
+export function buildRecommendation(result: ManualPredictionResult): PredictionRecommendation | null {
+  if (!result.recommendedSelection) return null;
+  const marketKey = result.recommendedMarket ?? null;
+  return {
+    marketKey,
+    marketLabel: result.marketLabel ?? (marketKey ? marketCategories[marketKey].label : ""),
+    selection: result.recommendedSelection,
+    estimatedProbability: result.estimatedProbability ?? null,
+    odds: result.availableOdds ?? null,
+    generatedAt: result.generatedAt,
+  };
+}
+
+/** The pick that was saved. When no choice was recorded, the engine's recommendation is it. */
+export function buildFinalSelection(
+  result: ManualPredictionResult,
+  recorded: SavedSelectionRecord | null,
+  marketLabel: string,
+): PredictionFinalSelection {
+  if (recorded) {
+    return {
+      marketLabel,
+      selection: recorded.selection,
+      odds: typeof recorded.odds === "number" ? recorded.odds : null,
+      probability: typeof recorded.probability === "number" ? recorded.probability : null,
+      source: recorded.source,
+    };
+  }
+  return {
+    marketLabel: result.marketLabel ?? marketLabel,
+    selection: result.recommendedSelection ?? "",
+    odds: result.availableOdds ?? null,
+    probability: result.estimatedProbability ?? null,
+    source: "unknown",
+  };
+}
+
+/** The preserved analysis snapshot, or null when the record carries none. */
+export function buildAnalysis(result: ManualPredictionResult): PredictionAnalysis | null {
+  const keyInsights = Array.isArray(result.keyInsights) ? result.keyInsights : [];
+  const weakeningFactors = Array.isArray(result.weakeningFactors) ? result.weakeningFactors : [];
+  if (!result.homeFormSummary && !result.awayFormSummary && !keyInsights.length && !weakeningFactors.length) {
+    return null;
+  }
+  return {
+    status: result.analysisStatus ?? null,
+    confidence: result.confidence ?? null,
+    dataQuality: result.dataQuality ?? null,
+    estimatedProbability: result.estimatedProbability ?? null,
+    availableOdds: result.availableOdds ?? null,
+    homeForm: result.homeFormSummary ?? "",
+    awayForm: result.awayFormSummary ?? "",
+    keyInsights,
+    weakeningFactors,
+  };
 }
 
 export async function readSavedEntries(uid: string): Promise<SavedEntry[]> {

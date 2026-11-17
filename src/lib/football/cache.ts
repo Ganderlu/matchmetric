@@ -170,6 +170,57 @@ export async function writeFixtures(
   }
 }
 
+/** Safety bound on a single by-id fixture read. */
+const FIXTURE_READ_CHUNK = 100;
+
+/** A cached fixture together with when its state was last written. */
+export interface CachedFixture extends Fixture {
+  /** ISO instant of the last cache write, or "" when the document carries none. */
+  cachedAt: string;
+}
+
+/**
+ * Read cached fixtures by id.
+ *
+ * Unlike `readFixtures` this is not scoped to a date window: the caller already knows which
+ * fixtures it needs, and the stored document is the app's latest known state for each one —
+ * including the live score, the minute and the provider's own status label. A missing document
+ * simply means that fixture has not been synced, and the caller decides what to show instead
+ * rather than inventing a state.
+ */
+export async function readCachedFixtures(ids: string[]): Promise<Map<string, CachedFixture>> {
+  const map = new Map<string, CachedFixture>();
+  const firestore = db();
+  if (!firestore || !ids.length) return map;
+
+  const unique = [...new Set(ids)];
+  try {
+    for (let index = 0; index < unique.length; index += FIXTURE_READ_CHUNK) {
+      const refs = unique
+        .slice(index, index + FIXTURE_READ_CHUNK)
+        .map((id) => firestore.collection(COLLECTIONS.fixtures).doc(id));
+      const docs = await firestore.getAll(...refs);
+      for (const doc of docs) {
+        if (!doc.exists) continue;
+        const stored = doc.data() as Fixture & { updatedAt?: unknown };
+        map.set(doc.id, {
+          ...dropMeta<Fixture>(stored, ["expiresAt", "updatedAt", "kickoffDate"]),
+          cachedAt: toIsoInstant(stored.updatedAt),
+        });
+      }
+    }
+  } catch {
+    return map;
+  }
+  return map;
+}
+
+function toIsoInstant(value: unknown): string {
+  const stamp = value as { toDate?: () => Date } | undefined;
+  const date = stamp?.toDate?.();
+  return date instanceof Date ? date.toISOString() : "";
+}
+
 /** The distinct competitions present in a fixture set, rebuilt as reference rows. */
 function leaguesOf(fixtures: Fixture[]): League[] {
   const leagues = new Map<string, League>();
